@@ -13,6 +13,7 @@ If you like my work, you can support me here:\
 :white_check_mark: Define min. and max. current for appliances supporting dynamic current control\
 :white_check_mark: Supports one- and three-phase appliances\
 :white_check_mark: Supports *Only-Switch-On* devices like washing machines or dishwashers
+:white_check_mark: Limit battery discharge via configurable *max battery draw*
 
 
 ## Prerequisites
@@ -52,6 +53,7 @@ If you like my work, you can support me here:\
 - For each appliance which should be controlled, create a new automation based on the *PV Excess Control* blueprint
 - After creating the automation, manually execute it once. This will send the chosen configuration parameters and sensors to the python module and start the optimizer in the background
 - The python module stays active in background, even if HA or the complete system is restarted
+- Optional: use the **max battery draw** parameter to specify how many watts may be drawn from your battery before appliances are shut down
 
 ### Update
 - To update the configuration, simply update the chosen parameters and values in your automation, which was created based on the blueprint.
