@@ -149,7 +149,7 @@ def pv_excess_control(automation_id, appliance_priority, export_power, pv_power,
                       min_home_battery_level, dynamic_current_appliance, appliance_phases, min_current,
                       max_current, appliance_switch, appliance_switch_interval, appliance_current_set_entity,
                       actual_power, defined_current, appliance_on_only, grid_voltage, import_export_power,
-                      home_battery_capacity, solar_production_forecast, appliance_once_only):
+                      home_battery_capacity, max_battery_draw, solar_production_forecast, appliance_once_only):
 
     automation_id = automation_id[11:] if automation_id[:11] == 'automation.' else automation_id
     automation_id = _replace_vowels(f"automation.{automation_id.strip().replace(' ', '_').lower()}")
@@ -160,8 +160,8 @@ def pv_excess_control(automation_id, appliance_priority, export_power, pv_power,
                     dynamic_current_appliance, appliance_phases, min_current,
                     max_current, appliance_switch, appliance_switch_interval,
                     appliance_current_set_entity, actual_power, defined_current, appliance_on_only,
-                    grid_voltage, import_export_power, home_battery_capacity, solar_production_forecast,
-                    appliance_once_only)
+                    grid_voltage, import_export_power, home_battery_capacity, max_battery_draw,
+                    solar_production_forecast, appliance_once_only)
 
 
 
@@ -199,7 +199,7 @@ class PvExcessControl:
                  min_home_battery_level, dynamic_current_appliance, appliance_phases, min_current,
                  max_current, appliance_switch, appliance_switch_interval, appliance_current_set_entity,
                  actual_power, defined_current, appliance_on_only, grid_voltage, import_export_power,
-                 home_battery_capacity, solar_production_forecast, appliance_once_only):
+                 home_battery_capacity, max_battery_draw, solar_production_forecast, appliance_once_only):
         if automation_id not in PvExcessControl.instances:
             inst = self
         else:
@@ -226,6 +226,7 @@ class PvExcessControl:
         inst.defined_current = float(defined_current)
         inst.appliance_on_only = bool(appliance_on_only)
         inst.appliance_once_only = appliance_once_only
+        inst.max_battery_draw = float(max_battery_draw)
 
         inst.phases = appliance_phases
 
@@ -367,9 +368,18 @@ class PvExcessControl:
                             allowed_excess_power_consumption = _get_num_state(inst.actual_power)
                     else:
                         allowed_excess_power_consumption = 0
-                    if avg_excess_power < PvExcessControl.min_excess_power - allowed_excess_power_consumption:
+                    # determine shutdown threshold
+                    threshold = PvExcessControl.min_excess_power
+                    if PvExcessControl.home_battery_level is None:
+                        home_level = 100
+                    else:
+                        home_level = _get_num_state(PvExcessControl.home_battery_level, return_on_error=100)
+                    if home_level >= PvExcessControl.min_home_battery_level and not self._force_charge_battery():
+                        threshold = -inst.max_battery_draw
+
+                    if avg_excess_power < threshold - allowed_excess_power_consumption:
                         log.debug(f'{log_prefix} Average Excess Power ({avg_excess_power} W) is less than minimum excess power '
-                                  f'({PvExcessControl.min_excess_power} W).')
+                                  f'({threshold} W).')
 
                         # check if current of dyn. curr. appliance can be reduced
                         if inst.dynamic_current_appliance:
@@ -410,7 +420,7 @@ class PvExcessControl:
                                           f'which is now {prev_consumption_sum} W.')
                     else:
                         log.debug(f'{log_prefix} Average Excess Power ({avg_excess_power} W) is still greater than minimum excess power '
-                                  f'({PvExcessControl.min_excess_power} W) - Doing nothing.')
+                                  f'({threshold} W) - Doing nothing.')
 
 
                 else:

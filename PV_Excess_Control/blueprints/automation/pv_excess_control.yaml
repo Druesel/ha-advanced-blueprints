@@ -1,14 +1,14 @@
 blueprint:
-  name: INVENTOCASA - PV Excess Optimizer
+  name: INVENTOCASA-CLONE - PV Excess Optimizer
   description: >
     ### **PV EXCESS OPTIMIZER**
     
     Automatically control your appliances based on excess power from your solar system <br> <br>
-    &rarr; Remember to read the **[README](https://github.com/InventoCasa/ha-advanced-blueprints/blob/main/PV_Excess_Control/README.md)** for prerequisites and installation instructions
+    &rarr; Remember to read the **[README](https://github.com/InventoCasa-Clone/ha-advanced-blueprints/blob/main/PV_Excess_Control/README.md)** for prerequisites and installation instructions
 
     &rarr; If you need help, head over to the [thread in the HA community forum](https://community.home-assistant.io/t/pv-solar-excess-optimizer-auto-control-appliances-wallbox-dish-washer-heatpump-based-on-excess-solar-power/552677)
 
-    &rarr; Bugs and feature requests can be created directly on the [GitHub repository](https://github.com/InventoCasa/ha-advanced-blueprints)
+    &rarr; Bugs and feature requests can be created directly on the [GitHub repository](https://github.com/InventoCasa-Clone/ha-advanced-blueprints)
 
 
     &rarr; If you want to say *thank you* for this blueprint, you can do so by buying me a [*virtual coffee*](https://www.buymeacoffee.com/henrikIC)
@@ -224,6 +224,20 @@ blueprint:
           step: 0.5
           unit_of_measurement: kWh
 
+    max_battery_draw:
+      name: "Maximum battery discharge draw"
+      description: >
+        Maximum power in watts that may be drawn from the home battery
+        before appliances are switched off. Set to 0 to prevent battery
+        discharge when the battery level is above the minimum level.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 10000
+          mode: box
+          unit_of_measurement: W
+
     solar_production_forecast:
       name: "*Remaining* solar production forecast (Solcast)"
       description: >
@@ -424,5 +438,6 @@ action:
       grid_voltage: !input grid_voltage
       import_export_power: !input import_export_power
       home_battery_capacity: !input home_battery_capacity
+      max_battery_draw: !input max_battery_draw
       solar_production_forecast: !input solar_production_forecast
       appliance_once_only: !input appliance_once_only
