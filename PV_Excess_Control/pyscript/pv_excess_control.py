@@ -337,7 +337,7 @@ class PvExcessControl:
                     # home battery charge is high enough to direct solar power to appliances, if solar power is higher than load power
                     # calc avg based on pv excess (solar power - load power) according to specified window
                     avg_excess_power = int(sum(PvExcessControl.pv_history[-inst.appliance_switch_interval:]) / max(1,inst.appliance_switch_interval))
-                    log.debug(f'{log_prefix} Home battery charge is sufficient ({home_battery_level}/{PvExcessControl.min_home_battery_level} %)'
+                    log.info(f'{log_prefix} Home battery charge is sufficient ({home_battery_level}/{PvExcessControl.min_home_battery_level} %)'
                               f' OR remaining solar forecast is higher than remaining capacity of home battery. '
                               f'Calculated average excess power based on >> solar power - load power <<: {avg_excess_power} W')
 
@@ -346,7 +346,7 @@ class PvExcessControl:
                     # Only use excess power (which would otherwise be exported to the grid) for appliance
                     # calc avg based on export power history according to specified window
                     avg_excess_power = int(sum(PvExcessControl.export_history[-inst.appliance_switch_interval:]) / max(1,inst.appliance_switch_interval))
-                    log.debug(f'{log_prefix} Home battery charge is not sufficient ({home_battery_level}/{PvExcessControl.min_home_battery_level} %), '
+                    log.warn(f'{log_prefix} Home battery charge is not sufficient ({home_battery_level}/{PvExcessControl.min_home_battery_level} %), '
                               f'OR remaining solar forecast is lower than remaining capacity of home battery. '
                               f'Calculated average excess power based on >> export power <<: {avg_excess_power} W')
 
@@ -381,7 +381,7 @@ class PvExcessControl:
                     defined_power = inst.defined_current * PvExcessControl.grid_voltage * inst.phases
 
                     if avg_excess_power >= defined_power or (inst.appliance_priority > 1000 and avg_excess_power > 0):
-                        log.debug(f'{log_prefix} Average Excess power is high enough to switch on appliance.')
+                        log.info(f'{log_prefix} Average Excess power is high enough to switch on appliance.')
                         if inst.switch_interval_counter >= inst.appliance_switch_interval:
                             self.switch_on(inst)
                             inst.switch_interval_counter = 0
@@ -392,7 +392,7 @@ class PvExcessControl:
                             if inst.dynamic_current_appliance:
                                 _set_value(inst.appliance_current_set_entity, inst.min_current)
                         else:
-                            log.debug(f'{log_prefix} Cannot switch on appliance, because appliance switch interval is not reached '
+                            log.info(f'{log_prefix} Cannot switch on appliance, because appliance switch interval is not reached '
                                       f'({inst.switch_interval_counter}/{inst.appliance_switch_interval}).')
                     else:
                         log.debug(f'{log_prefix} Average Excess power not high enough to switch on appliance.')
@@ -427,7 +427,7 @@ class PvExcessControl:
                         threshold = -inst.max_battery_draw
 
                     if avg_excess_power < threshold - allowed_excess_power_consumption:
-                        log.debug(f'{log_prefix} Average Excess Power ({avg_excess_power} W) is less than minimum excess power '
+                        log.info(f'{log_prefix} Average Excess Power ({avg_excess_power} W) is less than minimum excess power '
                                   f'({threshold} W).')
 
                         # check if current of dyn. curr. appliance can be reduced
@@ -648,7 +648,7 @@ class PvExcessControl:
         remaining_capacity = capacity - (0.01 * capacity * _get_num_state(PvExcessControl.home_battery_level, return_on_error=0))
         remaining_forecast = _get_num_state(PvExcessControl.solar_production_forecast, return_on_error=0)
         if remaining_forecast <= remaining_capacity + kwh_offset:
-            log.debug(f'Force battery charge necessary: {capacity=} kWh|{remaining_capacity=} kWh|{remaining_forecast=} kWh| '
+            log.warn(f'Force battery charge necessary: {capacity=} kWh|{remaining_capacity=} kWh|{remaining_forecast=} kWh| '
                       f'{kwh_offset=} kWh')
             # go through appliances lowest to highest priority, and try switching them off individually
             for a_id, e in dict(sorted(PvExcessControl.instances.items(), key=lambda item: item[1]['priority'])).items():
