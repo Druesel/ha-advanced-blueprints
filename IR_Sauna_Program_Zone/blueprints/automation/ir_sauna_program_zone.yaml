@@ -1,0 +1,245 @@
+blueprint:
+  name: IR Sauna – Programm Zone
+  description: >
+    Steuert zwei IR-Strahler (Liege+Oben) mit Programmen: Aus, Gleichmässig,
+    Intervall (Gleichlauf Welle) und Einmal Auf und Ab (Alias). Die Programmdauer
+    und maximale Intensität werden über Helper gesteuert. Transition 1s.
+  domain: automation
+  input:
+    select_program:
+      name: Programmauswahl (input_select)
+      selector:
+        entity:
+          domain: input_select
+    duration_minutes_entity:
+      name: Dauer in Minuten (input_number 5–30)
+      selector:
+        entity:
+          domain: input_number
+    max_intensity_pct_entity:
+      name: Max-Intensität % (input_number, Default 100)
+      selector:
+        entity:
+          domain: input_number
+    cycle_minutes_entity:
+      name: Intervall – Zyklusdauer in Minuten (input_number)
+      selector:
+        entity:
+          domain: input_number
+    timer_entity:
+      name: Timer für Restlaufzeit (timer)
+      selector:
+        entity:
+          domain: timer
+    strahler_liege:
+      name: Strahler - Liege
+      selector:
+        entity:
+          domain: light
+    strahler_oben:
+      name: Strahler - Oben
+      selector:
+        entity:
+          domain: light
+
+mode: restart
+max_exceeded: silent
+
+variables:
+  v_select: !input select_program
+  v_strahler_liege: !input strahler_liege
+  v_strahler_oben: !input strahler_oben
+  v_duration_entity: !input duration_minutes_entity
+  v_max_entity: !input max_intensity_pct_entity
+  v_cycle_entity: !input cycle_minutes_entity
+  v_timer: !input timer_entity
+
+  min_pct: 5
+  step_pct: 5
+
+triggers:
+  - trigger: state
+    entity_id: !input select_program
+  - trigger: event
+    event_type: timer.finished
+    event_data:
+      entity_id: !input timer_entity
+  - trigger: event
+    event_type: timer.cancelled
+    event_data:
+      entity_id: !input timer_entity
+
+actions:
+  - choose:
+      - conditions: >-
+          {{ trigger is defined
+            and trigger.platform == 'event'
+            and trigger.event.event_type in ['timer.finished','timer.cancelled'] }}
+        sequence:
+          - action: light.turn_off
+            target:
+              entity_id:
+                - !input strahler_liege
+                - !input strahler_oben
+            data:
+              transition: 1
+          - action: input_select.select_option
+            target:
+              entity_id: !input select_program
+            data:
+              option: 'AUS'
+          - stop: "Timer finished -> AUS"
+
+  - variables:
+      program: "{{ states(v_select) }}"
+      duration: "{{ states(v_duration_entity) | int(20) }}"
+      max_pct: "{{ states(v_max_entity) | int(100) }}"
+      up_steps: "{{ ((max_pct - min_pct) // step_pct) + 1 }}"
+      down_steps: "{{ ((max_pct - min_pct) // step_pct) + 1 }}"
+      steps_total: "{{ up_steps + down_steps }}"
+      cycle_min: "{{ states(v_cycle_entity) | int(5) }}"
+      sec_intervall: "{{ ((cycle_min | int(5)) * 60 / (steps_total | int(1))) | round(0, 'ceil') | int }}"
+      sec_once: "{{ ((duration | int(20)) * 60 / (steps_total | int(1))) | round(0, 'ceil') | int }}"
+      end_ts: "{{ now().timestamp() + (duration | int(20)) * 60 }}"
+
+  - choose:
+      - conditions: "{{ program == 'AUS' }}"
+        sequence:
+          - action: timer.cancel
+            target: { entity_id: !input timer_entity }
+    default:
+      - action: timer.start
+        target: { entity_id: !input timer_entity }
+        data:
+          duration: "{{ '%02d:%02d:%02d' | format(0, duration|int, 0) }}"
+
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ program == 'AUS' }}"
+        sequence:
+          - action: light.turn_off
+            target:
+              entity_id:
+                - !input strahler_liege
+                - !input strahler_oben
+            data:
+              transition: 1
+
+      - conditions:
+          - condition: template
+            value_template: "{{ program == 'Gleichmässig' }}"
+        sequence:
+          - action: light.turn_on
+            target:
+              entity_id:
+                - !input strahler_liege
+                - !input strahler_oben
+            data:
+              brightness_pct: "{{ max_pct }}"
+              transition: 1
+          - delay:
+              minutes: "{{ duration }}"
+          - action: light.turn_off
+            target:
+              entity_id:
+                - !input strahler_liege
+                - !input strahler_oben
+            data:
+              transition: 1
+          - action: timer.finish
+            target: { entity_id: !input timer_entity }
+          - action: input_select.select_option
+            target: { entity_id: !input select_program }
+            data: { option: 'AUS' }
+
+      - conditions:
+          - condition: template
+            value_template: "{{ program == 'Intervall' }}"
+        sequence:
+          - repeat:
+              while:
+                - condition: template
+                  value_template: "{{ is_state(v_select,'Intervall') and now().timestamp() < end_ts }}"
+              sequence:
+                - repeat:
+                    for_each: "{{ range((min_pct|int), (max_pct|int) + 1, (step_pct|int)) | list }}"
+                    sequence:
+                      - variables: { b: "{{ repeat.item }}" }
+                      - action: light.turn_on
+                        target:
+                          entity_id:
+                            - !input strahler_liege
+                            - !input strahler_oben
+                        data:
+                          brightness_pct: "{{ b }}"
+                          transition: 1
+                      - delay: { seconds: "{{ sec_intervall }}" }
+                - repeat:
+                    for_each: "{{ range((max_pct|int) - (step_pct|int), (min_pct|int) - 1, -(step_pct|int)) | list }}"
+                    sequence:
+                      - variables: { b: "{{ repeat.item }}" }
+                      - action: light.turn_on
+                        target:
+                          entity_id:
+                            - !input strahler_liege
+                            - !input strahler_oben
+                        data:
+                          brightness_pct: "{{ b }}"
+                          transition: 1
+                      - delay: { seconds: "{{ sec_intervall }}" }
+          - action: light.turn_off
+            target:
+              entity_id:
+                - !input strahler_liege
+                - !input strahler_oben
+            data:
+              transition: 1
+          - action: timer.finish
+            target: { entity_id: !input timer_entity }
+          - action: input_select.select_option
+            target: { entity_id: !input select_program }
+            data: { option: 'AUS' }
+
+      - conditions:
+          - condition: template
+            value_template: "{{ program == 'Einmal AUF und AB' }}"
+        sequence:
+          - repeat:
+              for_each: "{{ range((min_pct|int), (max_pct|int) + 1, (step_pct|int)) | list }}"
+              sequence:
+                - variables: { b: "{{ repeat.item }}" }
+                - action: light.turn_on
+                  target:
+                    entity_id:
+                      - !input strahler_liege
+                      - !input strahler_oben
+                  data:
+                    brightness_pct: "{{ b }}"
+                    transition: 1
+                - delay: { seconds: "{{ sec_once }}" }
+          - repeat:
+              for_each: "{{ range((max_pct|int) - (step_pct|int), (min_pct|int) - 1, -(step_pct|int)) | list }}"
+              sequence:
+                - variables: { b: "{{ repeat.item }}" }
+                - action: light.turn_on
+                  target:
+                    entity_id:
+                      - !input strahler_liege
+                      - !input strahler_oben
+                  data:
+                    brightness_pct: "{{ b }}"
+                    transition: 1
+                - delay: { seconds: "{{ sec_once }}" }
+          - action: light.turn_off
+            target:
+              entity_id:
+                - !input strahler_liege
+                - !input strahler_oben
+            data:
+              transition: 1
+          - action: timer.finish
+            target: { entity_id: !input timer_entity }
+          - action: input_select.select_option
+            target: { entity_id: !input select_program }
+            data: { option: 'AUS' }
