@@ -1,12 +1,10 @@
-# ha-advanced-blueprints
-Advanced Home Assistant Blueprints combined with pyscript for extra useful automations
+# ha-ir-sauna
 
-If you like my work, you can support me here:\
-[<img src="https://user-images.githubusercontent.com/1286821/181085373-12eee197-187a-4438-90fe-571ac6d68900.png" alt="Buy me a coffee" width="200" />](https://buymeacoffee.com/henrikIC)
+This Home Assistant blueprint controls two infrared heaters (`strahler_liege` and `strahler_oben`). It offers four operating modes:
 
-## Prerequisites
-- A working installation of [pyscript](https://github.com/custom-components/pyscript) (can be installed via [HACS](https://hacs.xyz/))
-- Home Assistant v2023.1 or greater
+- **AUS**: Turns both heaters off.
+- **Gleichmässig**: Runs both heaters at a constant brightness for the configured duration.
+- **Intervall**: Ramps brightness up and down in steps for a wave-like effect, repeating until the overall timer expires.
+- **Einmal AUF und AB**: Performs a single up-and-down brightness cycle over the total duration.
 
-## Documentation
-See seperate README within sub-folders
+Duration, maximum intensity, and cycle length (for *Intervall*) are taken from `input_number` helpers. A Home Assistant `timer` tracks the remaining runtime and stops the program when it finishes or is cancelled.
