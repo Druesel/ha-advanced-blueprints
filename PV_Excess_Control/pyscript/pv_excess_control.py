@@ -186,7 +186,7 @@ def _replace_vowels(input: str) -> str:
 
 @time_trigger("cron(0 0 * * *)")
 def reset_midnight():
-    log.info("Resetting 'switched_on_today' instance variables.")
+    log.debug("Resetting 'switched_on_today' instance variables.")
     for e in PvExcessControl.instances.copy().values():
         inst = e['instance']
         inst.switched_on_today = False
@@ -291,9 +291,9 @@ class PvExcessControl:
             inst.daily_run_time = 0
             inst.trigger_factory()
             PvExcessControl.instances[inst.automation_id] = {'instance': inst, 'priority': inst.appliance_priority}
-            log.info(f'{self.log_prefix} Trigger Method started.')
+            log.debug(f'{self.log_prefix} Trigger Method started.')
         PvExcessControl.instances = dict(sorted(PvExcessControl.instances.items(), key=lambda item: item[1]['priority'], reverse=True))
-        log.info(f'{inst.log_prefix} Registered appliance.')
+        log.debug(f'{inst.log_prefix} Registered appliance.')
 
     def trigger_factory(self):
         # trigger every 10s
@@ -337,7 +337,7 @@ class PvExcessControl:
                     # home battery charge is high enough to direct solar power to appliances, if solar power is higher than load power
                     # calc avg based on pv excess (solar power - load power) according to specified window
                     avg_excess_power = int(sum(PvExcessControl.pv_history[-inst.appliance_switch_interval:]) / max(1,inst.appliance_switch_interval))
-                    log.info(f'{log_prefix} Home battery charge is sufficient ({home_battery_level}/{PvExcessControl.min_home_battery_level} %)'
+                    log.debug(f'{log_prefix} Home battery charge is sufficient ({home_battery_level}/{PvExcessControl.min_home_battery_level} %)'
                               f' OR remaining solar forecast is higher than remaining capacity of home battery. '
                               f'Calculated average excess power based on >> solar power - load power <<: {avg_excess_power} W')
 
@@ -346,7 +346,7 @@ class PvExcessControl:
                     # Only use excess power (which would otherwise be exported to the grid) for appliance
                     # calc avg based on export power history according to specified window
                     avg_excess_power = int(sum(PvExcessControl.export_history[-inst.appliance_switch_interval:]) / max(1,inst.appliance_switch_interval))
-                    log.warn(f'{log_prefix} Home battery charge is not sufficient ({home_battery_level}/{PvExcessControl.min_home_battery_level} %), '
+                    log.debug(f'{log_prefix} Home battery charge is not sufficient ({home_battery_level}/{PvExcessControl.min_home_battery_level} %), '
                               f'OR remaining solar forecast is lower than remaining capacity of home battery. '
                               f'Calculated average excess power based on >> export power <<: {avg_excess_power} W')
 
@@ -360,7 +360,7 @@ class PvExcessControl:
                     # check if current of appliance can be increased
                     log.debug(f'{log_prefix} Appliance is already switched on.')
                     run_time = inst.daily_run_time + (datetime.datetime.now() - inst.switched_on_time).total_seconds()
-                    log.info(f'{inst.log_prefix} Application has run for {(run_time / 60):.1f} minutes')
+                    log.debug(f'{inst.log_prefix} Application has run for {(run_time / 60):.1f} minutes')
                     if avg_excess_power >= PvExcessControl.min_excess_power and inst.dynamic_current_appliance:
                         # try to increase dynamic current, because excess solar power is available
                         prev_amps = _get_num_state(inst.appliance_current_set_entity, return_on_error=inst.min_current)
@@ -596,7 +596,7 @@ class PvExcessControl:
             _turn_off(inst.appliance_switch)
             inst.daily_run_time += (datetime.datetime.now() - inst.switched_on_time).total_seconds()
             log.info(f'{inst.log_prefix} Switched off appliance.')
-            log.info(f'{inst.log_prefix} Application has run for {(inst.daily_run_time / 60):.1f} minutes')
+            log.debug(f'{inst.log_prefix} Application has run for {(inst.daily_run_time / 60):.1f} minutes')
             task.sleep(1)
             inst.switch_interval_counter = 0
             # "restart" history by adding defined power to each history value within the specified time frame
@@ -648,7 +648,7 @@ class PvExcessControl:
         remaining_capacity = capacity - (0.01 * capacity * _get_num_state(PvExcessControl.home_battery_level, return_on_error=0))
         remaining_forecast = _get_num_state(PvExcessControl.solar_production_forecast, return_on_error=0)
         if remaining_forecast <= remaining_capacity + kwh_offset:
-            log.warn(f'Force battery charge necessary: {capacity=} kWh|{remaining_capacity=} kWh|{remaining_forecast=} kWh| '
+            log.info(f'Force battery charge necessary: {capacity=} kWh|{remaining_capacity=} kWh|{remaining_forecast=} kWh| '
                       f'{kwh_offset=} kWh')
             # go through appliances lowest to highest priority, and try switching them off individually
             for a_id, e in dict(sorted(PvExcessControl.instances.items(), key=lambda item: item[1]['priority'])).items():
