@@ -416,6 +416,7 @@ trigger:
 
 
 action:
+  - delay: "00:00:30"
   - service: pyscript.pv_excess_control
     data:
       automation_id: !input automation_id
